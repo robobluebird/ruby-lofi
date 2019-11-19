@@ -6,7 +6,7 @@ A note: Why are `ruby-lofi` and `lofi` both repos? Well, `lofi` is the history o
 
 ## To run this app:
 
-You must have `sox` installed. Checkout out `http://sox.sourceforge.net/` to install it. This handles taking our audio data and turning it into sound! I apologize for the dependency, maybe in the future it can be removed...
+You must have `sox` installed. Checkout out `http://sox.sourceforge.net/` to install it. (If you have a mac you can run `brew install sox`!) This handles taking our audio data and turning it into sound! I apologize for the dependency, maybe in the future it can be removed...
 
 1. `git clone https://github.com/robobluebird/ruby-lofi`
 2. `cd ruby-lofi`
