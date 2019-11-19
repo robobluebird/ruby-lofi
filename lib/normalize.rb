@@ -10,7 +10,7 @@ class Normalize
     real_max = samples.max_by { |sample| sample.abs }.abs
 
     # float samples, so max should be +/-1.0
-    target_max = 0.9
+    target_max = 1.0
 
     # target maximum is x % of real maximum
     reduction_max = 1 - (target_max / real_max)
