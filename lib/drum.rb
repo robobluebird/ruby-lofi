@@ -87,9 +87,11 @@ class Drum
     if @rendered
       @chooser.add
     else
-      raise "disaster strikes" unless Dir.exists? "sounds/samples"
+      dir = File.expand_path("../../sounds/samples", __FILE__)
 
-      all_sounds = Dir.entries("sounds/samples")
+      raise "no ./sounds/samples directory!" unless Dir.exists? dir
+
+      all_sounds = Dir.entries(dir)
         .keep_if { |sound| sound.end_with? ".wav" }
         .sort
 
@@ -103,7 +105,7 @@ class Drum
         choices: all_sounds.map do |sound|
           {
             label: sound,
-            value: sound == "none" ? sound : "sounds/samples/#{sound}"
+            value: sound == "none" ? sound : File.join(dir, sound)
           }
         end
       )

@@ -1,36 +1,16 @@
-unless $LOAD_PATH.include?(File.expand_path(File.dirname(__FILE__)))
-  $LOAD_PATH.unshift(File.expand_path(File.dirname(__FILE__)))
-end
-
 require "ruby2d"
 require "ruby-audio"
 require "tempfile"
 require "securerandom"
 
-require "./lib/track"
-require "./lib/delay"
-# require "./lib/eq"
-require "./lib/normalize"
-require "./lib/rms"
-require "./lib/button"
-require "./lib/vertical_layout"
-require "./lib/visualized_track"
-require "./lib/beats_boi"
-require "./lib/slider"
-require "./lib/checkbox"
-require "./lib/horizontal_layout"
-require "./lib/files"
-require "./lib/effects"
-require "./lib/pattern"
-require "./lib/pattern_step"
-require "./lib/drum"
-require "./lib/heading"
-require "./lib/speed"
-require "./lib/chooser"
-require "./lib/choice"
-# require "./lib/leveller"
-require "./lib/stitch"
-require "./lib/rando"
+DIR = File.expand_path(File.dirname(__FILE__))
+
+Dir.entries("#{DIR}/lib").each do |entry|
+  if entry.include? ".rb"
+    name = entry.split(".rb").first
+    require "#{DIR}/lib/#{name}"
+  end
+end
 
 class Ruby2D::Text
   def full_width?
@@ -138,40 +118,6 @@ def project filepath
   end
 
   button_layout = HorizontalLayout.new @layout.width
-  # checks_layout = HorizontalLayout.new @layout.width
-  # background_effect_layout = HorizontalLayout.new @layout.width
-
-  # background_effect_layout.append Text.new(
-  #   "background effect",
-  #   color: "black",
-  #   font: File.join(__dir__, "fonts", "lux.ttf"),
-  #   size: 14
-  # )
-  #
-  # background_chooser = Chooser.new(
-  #   tag: "background",
-  #   choices: [
-  #     {
-  #       label: "none",
-  #       value: "none"
-  #     },
-  #     {
-  #       label: "rain",
-  #       value: "rain"
-  #     },
-  #     {
-  #       label: "vinyl",
-  #       value: "vinyl"
-  #     }
-  #   ]
-  # )
-  #
-  # background_chooser.on_change do |tag, label, value|
-  #   @bge = value.to_sym
-  #   enable_build
-  # end
-  #
-  # background_effect_layout.append background_chooser
 
   swing_checkbox = Checkbox.new label: "swing", checked: false
 
@@ -179,17 +125,6 @@ def project filepath
     @beat.swing = status
     enable_build
   end
-
-  # sample volumn? effect volumn?
-
-  # sample_layout = HorizontalLayout.new width: @width
-  #
-  # repeat_sample_checkbox = Checkbox.new label: "sample repeats", checked: true
-  #
-  # repeat_sample_checkbox.on_change do |status|
-  #   @beat.sample_repeat = status
-  #   enable_build
-  # end
 
   sample_length_slider = Slider.new(
     min: 1,
@@ -223,8 +158,6 @@ def project filepath
     enable_build
   end
 
-  # sample_layout.append(repeat_sample_checkbox).append(sample_length_slider)
-
   loops = Slider.new(
     label: "loops in track",
     min: 1,
@@ -252,44 +185,21 @@ def project filepath
     @beat.loops = value
     enable_build
   end
-
+  
   bpm_layout = HorizontalLayout.new @layout.width
-
-  # bpm_slider = Slider.new(
-  #   label: "bpm",
-  #   max: 180,
-  #   min: 40,
-  #   value: 120,
-  #   round_value: true,
-  #   show_value: true,
-  #   enabled: false
-  # ).remove
-
-  # bpm_slider.on_change do |value|
-  #   @beat.bpm = value
-  #   enable_build
-  # end
 
   @beat.on_bpm_change do |new_bpm, bad_bpm|
     @bpm_label.text = "bpm: #{bad_bpm || new_bpm.floor}"
   end
 
-  # ac = Checkbox.new label: "auto bpm", checked: true
-  #
-  # ac.on_change do |checked|
-  #   bpm_slider.enabled = !checked
-  #   @beat.bpm = v.bpm if checked
-  #   enable_build
-  # end
-
   @bpm_label = Text.new(
     "",
     color: "black",
-    font: File.join(__dir__, "fonts", "lux.ttf"),
+    font: File.join(DIR, "lib", "fonts", "lux.ttf"),
     size: 14
   )
 
-  bpm_layout.append(@bpm_label) # .append(ac).append(bpm_slider)
+  bpm_layout.append(@bpm_label)
 
   # screen width - edge margin * 2 - inner margins * 2 / 3
   button_width = (640 - 20 - 80) / 5
@@ -306,10 +216,7 @@ def project filepath
 
   @build_button = Button.new enabled: false, label: "build", height: 25, width: button_width
   @build_button.on_click do
-    Thread.new do
-      @path = @beat.write
-      # apply_background_effect @bge
-    end.join
+    @path = @beat.write
     disable_build
   end
 
@@ -353,8 +260,6 @@ def project filepath
     .append(@stop_button)
     .append(@export_button)
     .append(@new_button)
-
-  # .append(background_effect_layout)
 
   @layout
     .append(h1)
