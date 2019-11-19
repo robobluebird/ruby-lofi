@@ -136,7 +136,7 @@ def project filepath
   )
 
   measures = Slider.new(
-    label: "measures per loop",
+    label: "measures in loop",
     min: 1,
     max: 4,
     round_value: true,
