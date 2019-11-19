@@ -4,6 +4,8 @@ HELLO
 
 A note: Why are `ruby-lofi` and `lofi` both repos? Well, `lofi` is the history of the project but I somehow managed to bork it by making it 150 MB in size on accident. I'm sure this is a simple git fix but I was rushing to get ready for presenting it so I just created a new repo :) Use this one, `ruby-lofi`!
 
+A second note: Arduino Nanos remaining: 3 (send me a track to claim one!)
+
 ## To run this app:
 
 You must have `sox` installed. Checkout out `http://sox.sourceforge.net/` to install it. (If you have a mac you can run `brew install sox`!) This handles taking our audio data and turning it into sound! I apologize for the dependency, maybe in the future it can be removed...
