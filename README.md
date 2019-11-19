@@ -1,5 +1,4 @@
 # ruby-lofi
-ruby lofi
 
 HELLO
 
