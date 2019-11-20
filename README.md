@@ -10,11 +10,17 @@ A second note: Arduino Nanos remaining: 3 (send me a track to claim one!)
 
 You must have `sox` installed. Checkout out `http://sox.sourceforge.net/` to install it. (If you have a mac you can run `brew install sox`!) This handles taking our audio data and turning it into sound! I apologize for the dependency, maybe in the future it can be removed...
 
+### Suggested tools
+- [Bundler](https://bundler.io) to install ruby dependencies
+- [Homebrew](https://brew.sh) to install non-ruby dependencies like `sox`
+
 1. `git clone https://github.com/robobluebird/ruby-lofi`
-2. `cd ruby-lofi`
-3. `unzip sounds.zip`
-4. `cd ..`
-5. `ruby ruby-lofi/app.rb`
+1. `cd ruby-lofi`
+1. `bundle install`
+1. `brew bundle`
+1. `unzip sounds.zip`
+1. `cd ..`
+1. `ruby ruby-lofi/app.rb`
 
 ## To work on this app:
 
