@@ -1,7 +1,6 @@
 class BeatsBoi
   attr_reader :bpm
-  attr_accessor :sample_path, :sample_repeat, :sample_measures, :loops, :measures, :swing,
-                :sample_length
+  attr_accessor :sample_path, :sample_repeat, :sample_measures, :loops, :measures, :swing, :sample_length
 
   def initialize
     @filename = File.join "project", "#{SecureRandom.uuid}.wav"
@@ -48,16 +47,8 @@ class BeatsBoi
   end
 
   def bpm= new_bpm
-    bad_bpm = nil
-
-    @bpm = if new_bpm >= 40 && new_bpm <= 180
-             new_bpm
-           else
-             bad_bpm = new_bpm.to_i
-             120
-           end
-
-    @bpm_callback.call @bpm, bad_bpm if @bpm_callback
+    @bpm = new_bpm
+    @bpm_callback.call @bpm if @bpm_callback
   end
 
   def sample_steps
