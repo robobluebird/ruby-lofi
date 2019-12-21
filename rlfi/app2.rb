@@ -2,6 +2,7 @@ require "gosu"
 require "ruby-audio"
 require_relative "checkbox"
 require_relative "slider"
+require_relative "rms"
 
 class Track
   attr_accessor :buffer, :sample_rate, :channels, :format
@@ -25,19 +26,19 @@ class Track
   def rms
     @rms ||= begin
                return [] unless @buffer
-               group_size = @buffer.count / 640
-               @buffer.rms group_size
+               rms = RMS.new 640
+               rms.apply @buffer, @sample_rate, @channels
              end 
   end
 
   def draw
     rms.each.with_index do |r, i|
       max = r[1] * 50
-      min = r[2] * 50
-      # rms = r[0] * 50
+      min = r[2].abs * 50
+      rms = r[0] * 50
       Gosu::draw_rect i, 50 - max, 2, max, Gosu::Color::BLUE
-      Gosu::draw_rect i, 50, 2, min, Gosu::Color::GREEN
-      # Gosu::draw_rect i, 50 - (rms / 2), 2, rms, Gosu::Color::GREEN
+      Gosu::draw_rect i, 50, 2, min, Gosu::Color::BLUE
+      Gosu::draw_rect i, 50 - rms, 2, rms * 2, Gosu::Color::GREEN
     end
   end
 end
