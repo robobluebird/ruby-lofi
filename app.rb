@@ -1,3 +1,4 @@
+require 'mini_magick'
 require "ruby2d"
 require "ruby-audio"
 require "tempfile"
@@ -53,7 +54,7 @@ def intro
 
   button2.on_click do
     @layout.remove
-    
+
     s = Stitch.new width: get(:width)
 
     s.on_cancel do
@@ -72,8 +73,7 @@ def project filepath
   v = VisualizedTrack.new filepath
 
   v.on_change do |path, bpm|
-    @beat.sample_path = path
-    @beat.bpm = bpm
+    @beat.set_base path
     enable_build
   end
 
@@ -92,32 +92,32 @@ def project filepath
   d1 = Drum.new z: 20, :tag => 1
 
   d1.on_change do |tag, instrument, steps|
-    @beat.set tag, instrument, steps
+    @beat.set_pattern tag, instrument, steps
     enable_build
   end
 
   d2 = Drum.new z: 20, :tag => 2
 
   d2.on_change do |tag, instrument, steps|
-    @beat.set tag, instrument, steps
+    @beat.set_pattern tag, instrument, steps
     enable_build
   end
 
   d3 = Drum.new z: 20, :tag => 3
 
   d3.on_change do |tag, instrument, steps|
-    @beat.set tag, instrument, steps
+    @beat.set_pattern tag, instrument, steps
     enable_build
   end
 
   d4 = Drum.new z: 20, :tag => 4
 
   d4.on_change do |tag, instrument, steps|
-    @beat.set tag, instrument, steps
+    @beat.set_pattern tag, instrument, steps
     enable_build
   end
 
-  button_layout = HorizontalLayout.new @layout.width
+  puts "ye"
 
   swing_checkbox = Checkbox.new label: "swing", checked: false
 
@@ -126,80 +126,37 @@ def project filepath
     enable_build
   end
 
-  sample_length_slider = Slider.new(
+  measures_per_sample_slider = Slider.new(
     min: 1,
     max: 4,
-    value: 1,
-    label: "measures in sample",
+    value: @beat.measures_per_sample,
+    label: "measures per sample",
     show_value: true,
     round_value: true
   )
 
-  measures = Slider.new(
-    label: "measures in loop",
+  samples_per_loop_slider = Slider.new(
+    label: "samples per loop",
     min: 1,
     max: 4,
     round_value: true,
-    value: @beat.measures,
+    value: @beat.samples_per_loop,
     show_value: true
   )
 
-  sample_length_slider.on_change do |value|
-    @beat.sample_length = value
-    v.length = value
-    @beat.bpm = v.bpm
-    @beat.sample_measures = value
+  measures_per_sample_slider.on_change do |value|
+    # do it
 
-    if measures.value < value
-      measures.value = value
-      @beat.measures = value
-    end
-
-    enable_build
+    # enable_build
   end
 
-  loops = Slider.new(
-    label: "loops in track",
-    min: 1,
-    max: 4,
-    round_value: true,
-    value: @beat.loops,
-    show_value: true
-  )
+  samples_per_loop_slider.on_change do |value|
+    # do it
 
-  measures.on_change do |value|
-    @beat.measures = value
-
-    if sample_length_slider.value > value
-      sample_length_slider.value = value 
-      @beat.sample_length = value
-      v.length = value
-      @beat.bpm = v.bpm
-      @beat.sample_measures = value
-    end
-
-    enable_build
+    # enable_build
   end
 
-  loops.on_change do |value|
-    @beat.loops = value
-    enable_build
-  end
-  
-  bpm_layout = HorizontalLayout.new @layout.width
-
-  @beat.on_bpm_change do |new_bpm, bad_bpm|
-    @bpm_label.text = "bpm: #{bad_bpm || new_bpm.floor}"
-  end
-
-  @bpm_label = Text.new(
-    "",
-    color: "black",
-    font: File.join(DIR, "lib", "fonts", "lux.ttf"),
-    size: 14
-  )
-
-  bpm_layout.append(@bpm_label)
+  puts "ye2"
 
   # screen width - edge margin * 2 - inner margins * 2 / 3
   button_width = (640 - 20 - 80) / 5
@@ -216,7 +173,9 @@ def project filepath
 
   @build_button = Button.new enabled: false, label: "build", height: 25, width: button_width
   @build_button.on_click do
+    puts "writing beat"
     @path = @beat.write
+    puts "end writing beat"
     disable_build
   end
 
@@ -254,6 +213,8 @@ def project filepath
     @layout.append(hb).append(files)
   end
 
+  button_layout = HorizontalLayout.new @layout.width
+
   button_layout
     .append(@build_button)
     .append(@play_button)
@@ -273,18 +234,16 @@ def project filepath
     .append(d4)
     .append(h4)
     .append(swing_checkbox)
-    .append(sample_length_slider)
-    .append(measures)
-    .append(loops)
-    .append(bpm_layout)
+    .append(measures_per_sample_slider)
+    .append(samples_per_loop_slider)
     .append(h5)
     .append(button_layout)
 end
 
 def stop
-  if @path && @pid
-    Process.kill "HUP", @pid
-    @pid = nil
+  if @song
+    @song.stop
+    @song = nil
     @playing = false
     @play_button.deactivate
   end
@@ -292,8 +251,10 @@ end
 
 def play
   if @path
-    stop if @playing
-    @pid = spawn "play -q #{@path}"
+    @song.stop if @song
+    @song = Music.new @path
+    @song.volume = 50
+    @song.play
     @playing = true
     @play_button.activate
   end
@@ -315,81 +276,77 @@ def disable_build
   @export_button.enabled = true
 end
 
-begin
-  FileUtils.rm_rf "project"
-  FileUtils.mkdir "project"
+FileUtils.rm_rf "project"
+FileUtils.mkdir "project"
 
-  @path = nil
-  @pid = nil
-  @playing = false
-  @clicked = nil
-  @hovered = nil
-  @layout = VerticalLayout.new(
-    width: get(:width),
-    horizontal_margin: 10,
-    vertical_margin: 10
-  )
-  @beat = BeatsBoi.new
-  @beat.measures = 4
-  @path = nil
-  @ticks = 0
-  @bge = :none
+@path = nil
+@song = nil
+@playing = false
+@clicked = nil
+@hovered = nil
+@layout = VerticalLayout.new(
+  width: get(:width),
+  horizontal_margin: 10,
+  vertical_margin: 10
+)
+@beat = Composer.new
+@beat.measures_per_sample = 1
+@beat.samples_per_loop = 1
+@beat.loops = 4
+@path = nil
+@ticks = 0
+@bge = :none
 
-  def clicked_element x, y
-    @layout.element_at x, y
-  end
-
-  on :mouse_down do |event|
-    @clicked = clicked_element event.x, event.y
-    @clicked.mouse_down event.x, event.y if @clicked
-  end
-
-  on :mouse_up do |event|
-    @clicked.mouse_up event.x, event.y if @clicked
-    @clicked = nil
-  end
-
-  on :mouse_move do |event|
-    if @clicked
-      @clicked.mouse_move event.x, event.y
-    elsif @hovered = @layout.element_at(event.x, event.y)
-      @hovered.mouse_move event.x, event.y
-    else
-      @hovered = nil
-    end
-  end
-
-  on :mouse_scroll do |event|
-    if @hovered && @hovered.respond_to?(:mouse_scroll)
-      @hovered.mouse_scroll event.delta_x, event.delta_y, get(:mouse_x), get(:mouse_y)
-    end
-  end
-
-  on :key_down do |event|
-    if files = @layout.elements.find { |e| e.is_a? Files }
-      files.key_down event.key
-    elsif track = @layout.elements.find { |e| e.is_a? VisualizedTrack }
-      track.key_down event.key
-    end
-  end
-
-  on :key_up do |event|
-    if files = @layout.elements.find { |e| e.is_a? Files }
-      files.key_up event.key
-    elsif track = @layout.elements.find { |e| e.is_a? VisualizedTrack }
-      track.key_up event.key
-    end
-  end
-
-  set background: "white"
-  set title: "lofi ruby"
-  set height: 625
-
-  intro
-
-  show
-rescue Exception => e
-  puts e.message
-  puts e.backtrace
-  @layout.remove
+def clicked_element x, y
+  @layout.element_at x, y
 end
+
+on :mouse_down do |event|
+  @clicked = clicked_element event.x, event.y
+  @clicked.mouse_down event.x, event.y if @clicked
+end
+
+on :mouse_up do |event|
+  @clicked.mouse_up event.x, event.y if @clicked
+  @clicked = nil
+end
+
+on :mouse_move do |event|
+  if @clicked
+    @clicked.mouse_move event.x, event.y
+  elsif @hovered = @layout.element_at(event.x, event.y)
+    @hovered.mouse_move event.x, event.y
+  else
+    @hovered = nil
+  end
+end
+
+on :mouse_scroll do |event|
+  if @hovered && @hovered.respond_to?(:mouse_scroll)
+    @hovered.mouse_scroll event.delta_x, event.delta_y, get(:mouse_x), get(:mouse_y)
+  end
+end
+
+on :key_down do |event|
+  if files = @layout.elements.find { |e| e.is_a? Files }
+    files.key_down event.key
+  elsif track = @layout.elements.find { |e| e.is_a? VisualizedTrack }
+    track.key_down event.key
+  end
+end
+
+on :key_up do |event|
+  if files = @layout.elements.find { |e| e.is_a? Files }
+    files.key_up event.key
+  elsif track = @layout.elements.find { |e| e.is_a? VisualizedTrack }
+    track.key_up event.key
+  end
+end
+
+set background: "white"
+set title: "lofi ruby"
+set height: 625
+
+intro
+
+show

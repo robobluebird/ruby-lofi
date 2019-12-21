@@ -14,21 +14,18 @@ class VisualizedTrack
     @highlight = nil
     @rms_tines = []
     @peak_tines = []
-    @slice_count = 1000
+    @slice_count = 500
     @full_width = true
     @highlighting = false
     @selection = nil
     @did_move = false
-    @buttons = []
     @path = nil
     @beat_count = 4
     @pid = nil
-    @playing = false
     @callback = nil
-    @duration_per_tine = nil
     @keys = []
-    @start_index = 0
-    @end_index = @slice_count - 1
+    @sx = nil
+    @sxe = nil
     add
   end
 
@@ -71,27 +68,6 @@ class VisualizedTrack
     @border.width = new_width + 4
   end
 
-  def mouse_down x, y
-    if content_click x, y
-      @highlighting = true
-
-      if @keys.find { |k| k.include? "shift" }
-        @end_index = @rms_tines.index do |t|
-          t.x <= x && t.x + t.width >= x
-        end
-        draw_selection true
-        set_track_offsets
-        @did_move = true
-      else
-        @start_index = @rms_tines.index do |t|
-          t.x <= x && t.x + t.width >= x
-        end
-      end
-    elsif @button_clicked = button_click(x, y)
-      @button_clicked.mouse_down x, y
-    end
-  end
-
   # def mouse_scroll dx, dy, x, y
   #   if dy > 0 && !@track.zoomed_in?
   #     zoom :in, x
@@ -110,9 +86,8 @@ class VisualizedTrack
     if ["left", "right"].index key
       return unless @selection
 
-      shifted = @keys.find { |k| k.include? "shift" }
-
-      nudge shifted ? :end : :start, key.to_sym
+      # shifted = @keys.find { |k| k.include? "shift" }
+      # nudge shifted ? :end : :start, key.to_sym
     end
   end
 
@@ -121,10 +96,19 @@ class VisualizedTrack
       @content.y <= y && @content.y + @content.height >= y
   end
 
-  def button_click x, y
-    @buttons.find do |button|
-      button.x <= x && button.x + button.width >= x &&
-        button.y <= y && button.y + button.height >= y
+  def mouse_down x, y
+    if content_click x, y
+      @highlighting = true
+
+      if @keys.find { |k| k.include? "shift" }
+        offset_x = x - @content.x
+        @sxe = offset_x if @sx && offset_x > @sx
+        draw_selection true
+        @did_move = true
+      else
+        @sx = x - @content.x
+        @sxe = @sx
+      end
     end
   end
 
@@ -134,9 +118,6 @@ class VisualizedTrack
       draw_selection
       set_track_offsets
       @did_move = false
-    elsif @button_clicked
-      @button_clicked.mouse_up x, y
-      @button_clicked = nil
     end
   end
 
@@ -144,15 +125,13 @@ class VisualizedTrack
     if @highlighting
       @did_move = true
 
-      @end_index = @rms_tines.index do |t|
-        t.x <= x && t.x + t.width >= x
-      end || @slice_count - 1
+      offset_x = x - @content.x
+      if offset_x > @sx && offset_x < @content.width
+        @sxe = offset_x
+      end
 
       draw_selection
     end
-  end
-
-  def can_highlight
   end
 
   def remove
@@ -160,24 +139,6 @@ class VisualizedTrack
     @border.remove
     @content.remove
     clear_tines
-  end
-
-  def stop
-    if @pid
-      Process.kill "HUP", @pid
-      @pid = nil
-      @playing = false
-      @preview_button.deactivate
-    end
-  end
-
-  def play
-    if @path
-      stop if @playing
-      @pid = spawn "play -q #{@path} repeat -"
-      @playing = true
-      @preview_button.activate
-    end
   end
 
   def add
@@ -200,22 +161,6 @@ class VisualizedTrack
       color: @color,
       z: @z
     )
-
-    @preview_button = Button.new(
-      x: @x,
-      y: @y + 60,
-      width: 50,
-      height: 30,
-      label: "preview"
-    )
-
-    @preview_button.remove
-
-    @preview_button.on_click do
-      @playing ? stop : play
-    end
-
-    @buttons = [@preview_button]
   end
 
   def draw_selection from_nudge = false
@@ -224,57 +169,44 @@ class VisualizedTrack
 
     return unless @did_move || from_nudge
 
-    head = @rms_tines[@start_index]
-    tail = @rms_tines[@end_index]
-
-    tail = head if tail.x <= head.x
-
     @selection = Rectangle.new(
-      x: head.x,
+      x: @sx + @content.x,
       y: @y,
-      width: tail.x + tail.width - head.x,
+      width: @sxe - @sx,
       height: @height,
       color: "gray",
-      z: tail.z - 1
+      z: @content.z
     )
   end
 
-  def nudge start_or_end, direction
-    mod = direction == :left ? -1 : 1
-
-    if start_or_end == :start
-      new_value = @start_index + mod
-      if new_value > 0 && new_value < @end_index
-        @start_index = new_value
-      end
-    else
-      new_value = @end_index + mod
-      if new_value < @slice_count && new_value > @start_index
-        @end_index = new_value
-      end
-    end
-
-    draw_selection true
-    set_track_offsets
-  end
+  # def nudge start_or_end, direction
+  #   mod = direction == :left ? -1 : 1
+  #
+  #   if start_or_end == :start
+  #     new_value = @start_index + mod
+  #     if new_value > 0 && new_value < @end_index
+  #       @start_index = new_value
+  #     end
+  #   else
+  #     new_value = @end_index + mod
+  #     if new_value < @slice_count && new_value > @start_index
+  #       @end_index = new_value
+  #     end
+  #   end
+  #
+  #   draw_selection true
+  #   set_track_offsets
+  # end
 
   def set_track_offsets
-    was_playing = false
-
-    if @playing
-      stop
-      was_playing = true
-    end
-
     if @selection.nil?
       @track.reset
     else
-      start_percent = @start_index.to_f / @slice_count
-      end_percent = if @end_index == @slice_count - 1
-                      1.0
-                    else
-                      @end_index.to_f / @slice_count
-                    end
+      start_percent = @sx.to_f / @content.width
+      end_percent = @sxe.to_f / @content.width 
+
+      puts start_percent
+      puts end_percent
 
       return if start_percent > end_percent
 
@@ -282,8 +214,6 @@ class VisualizedTrack
     end
 
     write
-
-    play if was_playing
 
     @path
   end
@@ -301,98 +231,104 @@ class VisualizedTrack
     @callback.call @path, bpm if @callback
   end
 
-  def set_button_positions
-    @preview_button.x = @x + @width - @preview_button.width
-    @preview_button.y = @y + 60
-  end
-
   def clear_tines
     @peak_tines.each(&:remove)
+    @peak_tines.clear
     @peak_tines = []
     @rms_tines.each(&:remove)
+    @rms_tines.clear
     @rms_tines = []
   end
 
   def post_layout
-    visualize
+    # vis3
+    # vis2
   end
 
-  # def zoom dir, x
-  #   if dir == :in
-  #     index = @rms_tines.index do |t|
-  #       t.x <= x && t.x + t.width >= x
-  #     end
-  #
-  #     percent_pos = index.to_f / @slice_count
-  #
-  #     @track.zoom_in percent_pos
-  #   else
-  #     @track.zoom_out
-  #   end
-  # end
+  def vis3
+    # seconds of audio * 4 = 4 tines per second of audio
+    tine_count = (@track.buffer.count.to_f / @track.sample_rate) * 4
 
-  def visualize
-    raise unless @track.ready?
+    w = @width.to_f / tine_count
 
-    clear_tines
+    # get rms
+    group_size = @track.buffer.count / tine_count
+    rms = @track.buffer.rms group_size
 
-    tine_width = @width / @slice_count.to_f
-    rms = RMS.new @slice_count
-    buffer = @track.main_buffer
-    rms_result = rms.apply buffer, @track.sample_rate, @track.channels
-    max_tine_height = @height / 2
-
-    @duration_per_tine = @track.duration / @slice_count
-    @max_selectable_tine_count = (30.0 / @duration_per_tine).floor
-
+    # process them
     i = 0
+    x = @x
+    y = @y + @height / 2
 
-    while i < @slice_count do
-      if @track.channels == 1
-        rms_height = rms_result[i][0] * max_tine_height
-        above_the_line_height = rms_result[i][1].abs * max_tine_height
-        # below_the_line_height = rms_result[i][2].abs * max_tine_height
-      else
-        rms_height = (
-          (rms_result[i][0][1] + rms_result[i][0][1]) / 2
-        ) * max_tine_height
+    @tines = []
 
-        above_the_line_height = (
-          (rms_result[i][1][0] + rms_result[i][1][1]) / 2
-        ).abs * max_tine_height
-        
-        # below_the_line_height = (
-        #   (rms_result[i][2][0] + rms_result[i][2][1]) / 2
-        # ).abs * max_tine_height
-      end
+    puts @width
+    puts w
+    puts tine_count
+    puts group_size
 
-      x = @x + i * tine_width
+    while i < tine_count
+      h = @height * rms[i][0]
 
-      midpoint = @y + max_tine_height
+      puts rms[i]
 
-      @peak_tines << Rectangle.new(
+      @tines.push Rectangle.new(
         x: x,
-        y: midpoint - above_the_line_height,
-        width: tine_width,
-        height: above_the_line_height * 2.0,
+        y: y - h,
+        width: w,
+        height: h * 2,
         color: "black",
-        z: @z + 1
+        z: 1000
       )
 
-      @rms_tines << Rectangle.new(
-        x: x,
-        y: midpoint - rms_height / 2,
-        width: tine_width,
-        height: rms_height,
-        color: "gray",
-        z: @z + 1
-      )
-
+      x += w
       i += 1
     end
 
+    puts "cool"
+  end
+
+  def vis2
+    MiniMagick::Tool::Convert.new do |convert|
+      convert.size "#{@width * 2}x#{@height * 2}"
+      convert << 'xc:none'
+      convert.fill "rgba(0, 0, 0, 1)"
+      tine_width = @width * 2 / @slice_count.to_f
+      max_tine_height = @height * 2 / 2
+      group_size = @track.buffer.count / @slice_count
+      rms = @track.buffer.rms group_size
+
+      i = 0
+      bx, by = 0, 0
+
+      while i < @slice_count do
+        # rms_height = @rms[i][0] * max_tine_height
+        above_the_line_height = rms[i][1].abs * max_tine_height
+        midpoint = by + max_tine_height
+
+        x = bx + i * tine_width
+        y = midpoint - above_the_line_height
+        width = tine_width
+        height = above_the_line_height * 2.0
+
+        convert.draw "rectangle #{x},#{y} #{x + width},#{y + height}"
+
+        i += 1
+      end
+
+      convert << "project/waveform.png"
+    end
+
     set_track_offsets
-    set_button_positions
+
+    @image = Image.new(
+      "project/waveform.png",
+      x: @x,
+      y: @y,
+      width: @width,
+      height: @height,
+      z: @z + 1
+    )
   end
 end
 

@@ -17,6 +17,7 @@ class Track
     @sample_rate_modifier = 1.0
     @output_filename = output_filename
 
+    @channels = 1
     @delay_rate = nil
     @decay_rate = nil
     @eq_high = nil
@@ -39,13 +40,16 @@ class Track
 
   def read
     RubyAudio::Sound.open @input_filepath do |sound|
-      @main_buffer = sound.read :float, sound.info.frames
+
+      # explicitly create the buffer to allow us to coerce the sound to 1 channel
+      # in the following "read"
+      @main_buffer = RubyAudio::Buffer.float sound.info.frames, @channels
+      sound.read @main_buffer
+
       @start_offset = 0
       @end_offset = @main_buffer.real_size
-      @main_buffer = monoize if sound.info.channels == 2
-      @channels = DEFAULT_CHANNELS
       @sample_rate = sound.info.samplerate
-      @format = sound.info.format # RubyAudio::FORMAT_PCM_U8 # ??? 
+      @format = sound.info.format
       @buffer = sample
       @output_filename = @output_filename ||
         "#{@input_filename.split(".").first.downcase.gsub(" ", "_")}_ruby_lofi.wav"
@@ -97,11 +101,11 @@ class Track
       buffer = fade.apply buffer, @sample_rate, @channels
     end
 
-    norm = Normalize.new
-    buffer = norm.apply buffer, @sample_rate, @channels
-
     rando = Rando.new
     buffer = rando.apply buffer, @sample_rate, @channels
+
+    norm = Normalize.new
+    buffer = norm.apply buffer, @sample_rate, @channels
 
     out.write buffer
 
@@ -166,23 +170,6 @@ class Track
     raise SoundNotLoadedError if @buffer.nil?
 
     analyzer.apply @buffer, @sample_rate, @channels
-  end
-  
-  private
-
-  def monoize
-    new_buffer_frame_count = @end_offset - @start_offset
-    new_buffer = RubyAudio::Buffer.float new_buffer_frame_count, 1
-    new_buffer_index = 0
-    old_buffer_index = @start_offset
-
-    while new_buffer_index < new_buffer_frame_count
-      new_buffer[new_buffer_index] = @main_buffer[old_buffer_index].reduce(&:+) / 2
-      new_buffer_index += 1
-      old_buffer_index += 1
-    end
-
-    new_buffer
   end
 
   def sample
