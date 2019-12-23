@@ -5,10 +5,40 @@ require_relative "slider"
 require_relative "rms"
 
 class Track
-  attr_accessor :buffer, :sample_rate, :channels, :format
+  attr_accessor :buffer, :selection_buffer, :sample_rate, :channels, :format
 
-  def initialize filepath
+  def initialize filepath, x, y, width, height
     @filepath = filepath
+    @x = x
+    @y = y
+    @height = height
+    @width = width
+  end
+
+  def contains? x, y
+    @x <= x && @x + @width >= x && @y <= y && @y + @height >= y
+  end
+
+  def mouse_down x, y
+    @start_x = x
+  end
+
+  def mouse_up x, y
+    if @start_x && @select_x
+      if @select_x <= @start_x
+        @start_x, @select_x, @selection_buffer = nil, nil, nil
+      else
+        buffer_count = @buffer.count
+        start_index = (((@start_x - @x) / @width) * buffer_count).to_i
+        end_index = ((@select_x - @x) / @width * buffer_count).to_i
+        @selection_buffer = RubyAudio::Buffer.float end_index - start_index + 1, @channels
+        (start_index..end_index).each.with_index { |i,j| @selection_buffer[j] = @buffer[i] }
+      end
+    end
+  end
+
+  def mouse_update x, y
+    @select_x = x
   end
 
   def read
@@ -25,20 +55,25 @@ class Track
 
   def rms
     @rms ||= begin
-               return [] unless @buffer
-               rms = RMS.new 640
-               rms.apply @buffer, @sample_rate, @channels
-             end 
+      return [] unless @buffer
+      rms = RMS.new @width
+      rms.apply @buffer, @sample_rate, @channels
+    end 
   end
 
   def draw
+    if @start_x && @select_x && @select_x - @start_x > 0
+      Gosu::draw_rect @start_x, @y, @select_x - @start_x, @height, Gosu::Color::GRAY
+    end
+
+		h = 20
     rms.each.with_index do |r, i|
-      max = r[1] * 50
-      min = r[2].abs * 50
-      rms = r[0] * 50
-      Gosu::draw_rect i, 50 - max, 2, max, Gosu::Color::BLUE
-      Gosu::draw_rect i, 50, 2, min, Gosu::Color::BLUE
-      Gosu::draw_rect i, 50 - rms, 2, rms * 2, Gosu::Color::GREEN
+      max = r[1] * h
+      min = r[2].abs * h
+      rms = r[0] * h
+      Gosu::draw_rect @x + i, @y + h - max, 1, max, Gosu::Color::BLUE
+      Gosu::draw_rect @x + i, @y + h, 1, min, Gosu::Color::BLUE
+      Gosu::draw_rect @x + i, @y + h - rms, 1, rms * 2, Gosu::Color::GREEN
     end
   end
 end
@@ -55,24 +90,31 @@ class Lofi < Gosu::Window
     @c1 = Checkbox.new width / 4, height / 4, 20, true
     @s1 = Slider.new (width / 4) * 3, (height / 4) * 3, 100, 1, 4, true, true
 
-    @elements = [@c1, @s1] + tracks
+    @elements = tracks
 
     @mouse_down = false
   end
 
   def tracks
+    y = 0
     @files.map do |filepath|
-      track = Track.new filepath
+      track = Track.new filepath, 40, y, 600, 40
       track.read
+      y += 40
       track
     end
   end
 
   def update
     if button_down? Gosu::MS_LEFT
-      @mouse_down = true
-      down = @elements.find { |e| e.contains? mouse_x, mouse_y }
-      down.mouse_down mouse_x, mouse_y if down
+      if @mouse_down
+        down = @elements.find { |e| e.contains? mouse_x, mouse_y }
+        down.mouse_update mouse_x, mouse_y if down
+      else
+        @mouse_down = true
+        down = @elements.find { |e| e.contains? mouse_x, mouse_y }
+        down.mouse_down mouse_x, mouse_y if down
+      end
     elsif @mouse_down
       @mouse_down = false
       up = @elements.find { |e| e.contains? mouse_x, mouse_y }
