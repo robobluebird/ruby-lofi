@@ -6,24 +6,32 @@ require_relative "speed"
 require_relative "delay"
 
 class Track
-  attr_reader :buffer, :selection_buffer, :modified_selection_buffer, :sample_rate, :channels, :format
+  attr_reader :buffer, :selection_buffer, :modified_selection_buffer, :sample_rate, :channels, :format,
+              :filepath, :filename
+
+  attr_accessor :y, :height
   
   TRACK_HEIGHT = 40
 
-  def initialize filepath, x, y, width, height
+  def initialize filepath, x, y, width, height, prime = false, tag = nil
     @filepath = filepath
+    @filename = filepath.split("/").last
     @x = x
     @y = y
     @height = height
     @width = width
     @selecting = false
+    @prime = prime
+    @tag = tag
 
     reset_effects
 
-    @effect_width = width / 6
+    @effect_width = width / 10
 
-    @speed_text = Gosu::Image.from_text "speed", 16
-    @speed_slider = Slider.new @x + @effect_width, @y + TRACK_HEIGHT, @effect_width, 0, 2, @speed
+    x = @x - 20
+
+    @speed_text = Gosu::Image.from_text "spd", 16
+    @speed_slider = Slider.new x + @effect_width, @y + TRACK_HEIGHT, @effect_width, 0, 2, @speed
     @speed_slider.on_change do |value|
       if @speed > 0
         @speed = value
@@ -31,27 +39,64 @@ class Track
       end
     end
 
-    @delay_text = Gosu::Image.from_text "delay", 16
-    @delay_slider = Slider.new @x + @effect_width * 3, @y + TRACK_HEIGHT, @effect_width, 0, 3, @delay
+    @delay_text = Gosu::Image.from_text "dly", 16
+    @delay_slider = Slider.new x + @effect_width * 3, @y + TRACK_HEIGHT, @effect_width, 0, 3, @delay
     @delay_slider.on_change do |value|
       @delay = value
       process_effects
     end
 
-    @decay_text = Gosu::Image.from_text "decay", 16
-    @decay_slider = Slider.new @x + @effect_width * 5, @y + TRACK_HEIGHT, @effect_width, 0, 3, @decay
+    @decay_text = Gosu::Image.from_text "dcy", 16
+    @decay_slider = Slider.new x + @effect_width * 5, @y + TRACK_HEIGHT, @effect_width, 0, 3, @decay
     @decay_slider.on_change do |value|
       @decay = value
       process_effects
     end
 
-    @subelements = [@speed_slider, @delay_slider, @decay_slider]
+    @limit_text = Gosu::Image.from_text "lmt", 16
+    @limit_slider = Slider.new x + @effect_width * 7, @y + TRACK_HEIGHT, @effect_width, 0, 4, @limit, true
+    @limit_slider.on_change do |value|
+      @limit = value
+      # process_effects
+    end
+
+    @volume_text = Gosu::Image.from_text "vol", 16
+    @volume_slider = Slider.new x + @effect_width * 9, @y + TRACK_HEIGHT, @effect_width, 0, 2, @volume
+    @volume_slider.on_change do |value|
+      @volume = value
+      # process_effects
+    end
+
+    @covers_text = Gosu::Image.from_text "selection contains x measures", 16
+    @covers_slider = Slider.new x + @covers_text.width + 20, @y + TRACK_HEIGHT * 2, 100, 1, 8, 1, true, true
+
+    @subelements = [@speed_slider, @delay_slider, @decay_slider, @limit_slider, @volume_slider]
+  end
+
+  def y= new_y
+    @y = new_y
+    @subelements.each { |elem| elem.y = @y + TRACK_HEIGHT }
+    @covers_slider.y = @y + TRACK_HEIGHT * 2
+  end
+
+  def prime= is_prime
+    @prime = !!is_prime
+
+    if @prime
+      @height = TRACK_HEIGHT * 3
+      @subelements.push @covers_slider
+    else
+      @height = TRACK_HEIGHT * 2
+      @subelements.delete @covers_slider
+    end
   end
 
   def reset_effects
     @speed = 1.0
     @delay = 0.0
     @decay = 0.0
+    @limit = 0
+    @volume = 1.0
   end
 
   def on_change &block
@@ -84,7 +129,7 @@ class Track
   end
 
   def mouse_down x, y
-    if x >= @x && x <= @x + @width && y >= @y && y <= @y + 40
+    if x >= @x && x <= @x + @width && y >= @y && y <= @y + TRACK_HEIGHT
       @selecting = true
       @start_x = x
     elsif @subelement = @subelements.find { |e| e.contains? x, y }
@@ -159,12 +204,18 @@ class Track
     y = @y + TRACK_HEIGHT
 
     # x, y, z, scale_x, scale_y, color
-    @speed_text.draw @x + @effect_width - @speed_text.width - 20, y, 1, 1, 1, Gosu::Color::BLACK
-    @delay_text.draw @x + @effect_width * 3 - @delay_text.width - 20, y, 1, 1, 1, Gosu::Color::BLACK
-    @decay_text.draw @x + @effect_width * 5 - @decay_text.width - 20, y, 1, 1, 1, Gosu::Color::BLACK
+    @speed_text.draw @x, y, 1, 1, 1, Gosu::Color::BLACK
+    @delay_text.draw @x + @effect_width * 2, y, 1, 1, 1, Gosu::Color::BLACK
+    @decay_text.draw @x + @effect_width * 4, y, 1, 1, 1, Gosu::Color::BLACK
+    @limit_text.draw @x + @effect_width * 6, y, 1, 1, 1, Gosu::Color::BLACK
+    @volume_text.draw @x + @effect_width * 8, y, 1, 1, 1, Gosu::Color::BLACK
+    @covers_text.draw @x, y + TRACK_HEIGHT, 1, 1, 1, Gosu::Color::BLACK if @prime
 
     @speed_slider.draw
     @delay_slider.draw
     @decay_slider.draw
+    @limit_slider.draw
+    @volume_slider.draw
+    @covers_slider.draw if @prime
   end
 end

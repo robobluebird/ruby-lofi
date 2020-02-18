@@ -10,21 +10,54 @@ class Lofi < Gosu::Window
     self.caption = "ruby lofi"
 
     @files = ARGV
-    @font = Gosu::Font.new self, Gosu::default_font_name, 20
-    @elements = tracks
+    @prime_checks = []
     @mouse_down = false
+    @elements = tracks.dup
+    @elements.concat @prime_checks
+  end
+
+  def deprime
+    @tracks.each do |t|
+      t.prime = false
+    end
+  end
+
+  def decheck tag
+    @prime_checks.each { |c| c.set_checked c.tag == tag, false }
   end
 
   def tracks
     @tracks ||= begin
       y = 0
-      @files.map do |filepath|
-        track = Track.new filepath, 20, y, 600, 60
+
+      @files.map.with_index do |filepath, i|
+        track = Track.new filepath, 30, y, 610, 80, y == 0, i
         track.read
-        y += 60
-        track.on_change do |buffer|
-          puts buffer
+
+        track.on_change do |buffer, pattern|
+          puts buffer, pattern
         end
+
+        c = Checkbox.new 10, y + 15, 10, i == 0, i, true, 1, false
+        c.on_change do |checked, tag|
+          if checked
+            deprime
+            decheck tag
+            track.prime = true
+
+            ty = 0
+            @tracks.each.with_index do |t, ti|
+              t.y = ty
+              @prime_checks[ti].y = ty + 15
+              ty += t.height
+            end
+          end
+        end
+
+        @prime_checks << c
+
+        y += 80
+
         track
       end
     end
@@ -50,15 +83,21 @@ class Lofi < Gosu::Window
   def draw
     draw_rect 0, 0, width, height, Gosu::Color::WHITE
 
-    @r = Gosu::Image.from_text "what the...", 20
+    # @r = Gosu::Image.from_text "what the...", 20
 
     # x, y, z, angle, center_x, center_y, scale_x, scale_y, color
-    @r.draw_rot width / 2, height / 2, 1, 0, 0.5, 0.5, 1, 1, Gosu::Color::BLACK
+    # @r.draw_rot width / 2, height / 2, 1, 0, 0.5, 0.5, 1, 1, Gosu::Color::BLACK
 
     tracks.each(&:draw)
+    @prime_checks.each(&:draw)
+
+    y = tracks.count * tracks.first.height
+
     tracks.each do |track|
-      if track.selection_buffer
-        # draw sequencer for track
+      if track.modified_selection_buffer
+        t = Gosu::Image.from_text track.filename, 20
+        t.draw 0, y, 1, 1, 1, Gosu::Color::BLACK
+        y += t.height
       end
     end
   end
@@ -66,6 +105,18 @@ class Lofi < Gosu::Window
   def needs_cursor?
     true
   end
+
+=begin
+@beat = Composer.new
+@beat.measures_per_sample = 1
+@beat.samples_per_loop = 1
+@beat.loops = 4
+@beat.set_base path
+@beat.set_pattern tag, instrument, steps
+@beat.swing = status
+@path = @beat.write
+=end
+
 end
 
 Lofi.new.show
