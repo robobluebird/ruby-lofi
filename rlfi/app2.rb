@@ -14,6 +14,7 @@ class Lofi < Gosu::Window
     @mouse_down = false
     @elements = tracks.dup
     @elements.concat @prime_checks
+    @prime_checks.first.set_checked true
   end
 
   def deprime

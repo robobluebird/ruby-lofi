@@ -4,6 +4,7 @@ require_relative "rms"
 require_relative "slider"
 require_relative "speed"
 require_relative "delay"
+require_relative "play_button"
 
 class Track
   attr_reader :buffer, :selection_buffer, :modified_selection_buffer, :sample_rate, :channels, :format,
@@ -70,13 +71,16 @@ class Track
     @covers_text = Gosu::Image.from_text "selection contains x measures", 16
     @covers_slider = Slider.new x + @covers_text.width + 20, @y + TRACK_HEIGHT * 2, 100, 1, 8, 1, true, true
 
-    @subelements = [@speed_slider, @delay_slider, @decay_slider, @limit_slider, @volume_slider]
+    @play_button = PlayButton.new @x + @width - 20, @y + TRACK_HEIGHT, 10, false
+
+    @subelements = [@speed_slider, @delay_slider, @decay_slider, @limit_slider, @volume_slider, @play_button]
   end
 
   def y= new_y
     @y = new_y
     @subelements.each { |elem| elem.y = @y + TRACK_HEIGHT }
     @covers_slider.y = @y + TRACK_HEIGHT * 2
+    @play_button.y = @y + TRACK_HEIGHT - @play_button.size / 2.0
   end
 
   def prime= is_prime
@@ -106,6 +110,7 @@ class Track
   def process_effects
     unless @selection_buffer
       @modified_selection_buffer = nil
+      @play_button.enabled = false
       return
     end
 
@@ -120,6 +125,8 @@ class Track
       @modified_selection_buffer =
         Delay.new(@delay, @decay).apply @modified_selection_buffer, @sample_rate, @channels
     end
+
+    @play_button.enabled = true
 
     @callback.call @modified_selection_buffer if @callback
   end
@@ -216,6 +223,7 @@ class Track
     @decay_slider.draw
     @limit_slider.draw
     @volume_slider.draw
+    @play_button.draw
     @covers_slider.draw if @prime
   end
 end
