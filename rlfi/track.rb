@@ -1,10 +1,13 @@
 require "gosu"
 require "ruby-audio"
+require "securerandom"
 require_relative "rms"
 require_relative "slider"
 require_relative "speed"
 require_relative "delay"
 require_relative "play_button"
+require_relative "writer"
+require_relative "player"
 
 class Track
   attr_reader :buffer, :selection_buffer, :modified_selection_buffer, :sample_rate, :channels, :format,
@@ -15,6 +18,7 @@ class Track
   TRACK_HEIGHT = 40
 
   def initialize filepath, x, y, width, height, prime = false, tag = nil
+    @uuid = SecureRandom.uuid
     @filepath = filepath
     @filename = filepath.split("/").last
     @x = x
@@ -24,6 +28,7 @@ class Track
     @selecting = false
     @prime = prime
     @tag = tag
+    @track_width = width - 20
 
     reset_effects
 
@@ -68,10 +73,13 @@ class Track
       # process_effects
     end
 
-    @covers_text = Gosu::Image.from_text "selection contains x measures", 16
+    @covers_text = Gosu::Image.from_text "measures", 16
     @covers_slider = Slider.new x + @covers_text.width + 20, @y + TRACK_HEIGHT * 2, 100, 1, 8, 1, true, true
 
-    @play_button = PlayButton.new @x + @width - 20, @y + TRACK_HEIGHT, 10, false
+    @play_button = PlayButton.new @x + @width - 20, @y + TRACK_HEIGHT / 2 - 5, 10, false
+    @play_button.on_click do
+      @player.toggle if @player
+    end
 
     @subelements = [@speed_slider, @delay_slider, @decay_slider, @limit_slider, @volume_slider, @play_button]
   end
@@ -80,7 +88,7 @@ class Track
     @y = new_y
     @subelements.each { |elem| elem.y = @y + TRACK_HEIGHT }
     @covers_slider.y = @y + TRACK_HEIGHT * 2
-    @play_button.y = @y + TRACK_HEIGHT - @play_button.size / 2.0
+    @play_button.y = @y + TRACK_HEIGHT / 2 - @play_button.size / 2.0
   end
 
   def prime= is_prime
@@ -126,9 +134,25 @@ class Track
         Delay.new(@delay, @decay).apply @modified_selection_buffer, @sample_rate, @channels
     end
 
-    @play_button.enabled = true
-
-    @callback.call @modified_selection_buffer if @callback
+    Writer.new(
+      @modified_selection_buffer,
+      @uuid,
+      @channels,
+      @sample_rate,
+      @format
+    ).on_write do |path|
+      @path = path
+      @player.stop if @player && @player.playing?
+      @player = Player.new @path
+      @player.on_update do |time|
+        puts time
+      end
+      @player.on_done do
+        @play_button.off
+      end
+      @play_button.enabled = true
+      @callback.call @modified_selection_buffer if @callback
+    end.write
   end
 
   def contains? x, y
@@ -136,11 +160,11 @@ class Track
   end
 
   def mouse_down x, y
-    if x >= @x && x <= @x + @width && y >= @y && y <= @y + TRACK_HEIGHT
+    if @subelement = @subelements.find { |e| e.contains? x, y }
+      @subelement.mouse_down x, y
+    elsif x >= @x && x <= @x + @track_width && y >= @y && y <= @y + TRACK_HEIGHT
       @selecting = true
       @start_x = x
-    elsif @subelement = @subelements.find { |e| e.contains? x, y }
-      @subelement.mouse_down x, y
     end
   end
 
@@ -188,7 +212,7 @@ class Track
   def rms
     @rms ||= begin
       return [] unless @buffer
-      rms = RMS.new @width
+      rms = RMS.new @track_width
       rms.apply @buffer, @sample_rate, @channels
     end 
   end

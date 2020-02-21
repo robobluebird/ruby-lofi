@@ -1,4 +1,5 @@
 require "gosu"
+require "fileutils"
 require_relative "checkbox"
 require_relative "slider"
 require_relative "track"
@@ -15,6 +16,9 @@ class Lofi < Gosu::Window
     @elements = tracks.dup
     @elements.concat @prime_checks
     @prime_checks.first.set_checked true
+
+    # FileUtils.rm_rf "lofi"
+    FileUtils.mkdir "lofi" unless Dir.exists? "lofi"
   end
 
   def deprime

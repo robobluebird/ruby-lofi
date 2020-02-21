@@ -6,6 +6,15 @@ class PlayButton
     @y = y
     @size = size
     @enabled = enabled
+    @on = false
+  end
+
+  def off
+    @on = false
+  end
+
+  def on_click &block
+    @callback = block
   end
 
   def enabled= e
@@ -28,10 +37,6 @@ class PlayButton
     Gosu::Color::GRAY
   end
 
-  def on_change &block
-    @callback = block
-  end
-
   def contains? x, y
     @x <= x && @x + @size >= x && @y <= y && @y + @size >= y
   end
@@ -45,6 +50,7 @@ class PlayButton
     return unless enabled?
     if @pressed
       @pressed = false
+      @on = !@on
       @callback.call if @callback
     end
   end
@@ -60,6 +66,12 @@ class PlayButton
   def draw
     tc, bgc = enabled? ? pressed? ? [white, black] : [black, white] : [gray, white]
     Gosu::draw_rect @x, @y, @size, @size, bgc
-    Gosu::draw_triangle @x, @y, tc, @x + @size, @y + @size / 2.0, tc, @x, @y + @size, tc
+
+    if @on
+      Gosu::draw_rect @x + 2, @y, 2, @size, tc
+      Gosu::draw_rect @x + 6, @y, 2, @size, tc
+    else
+      Gosu::draw_triangle @x, @y, tc, @x + @size, @y + @size / 2.0, tc, @x, @y + @size, tc
+    end
   end
 end
