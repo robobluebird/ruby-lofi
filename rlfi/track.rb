@@ -8,6 +8,8 @@ require_relative "delay"
 require_relative "play_button"
 require_relative "writer"
 require_relative "player"
+require_relative "leveler"
+require_relative "volume"
 
 class Track
   attr_reader :buffer, :selection_buffer, :modified_selection_buffer, :sample_rate, :channels, :format,
@@ -59,18 +61,18 @@ class Track
       process_effects
     end
 
-    @limit_text = Gosu::Image.from_text "lmt", 16
-    @limit_slider = Slider.new x + @effect_width * 7, @y + TRACK_HEIGHT, @effect_width, 0, 4, @limit, true
-    @limit_slider.on_change do |value|
-      @limit = value
-      # process_effects
+    @leveler_text = Gosu::Image.from_text "lev", 16
+    @leveler_slider = Slider.new x + @effect_width * 7, @y + TRACK_HEIGHT, @effect_width, 0, 4, @level, true, true
+    @leveler_slider.on_change do |value|
+      @level = value
+      process_effects
     end
 
     @volume_text = Gosu::Image.from_text "vol", 16
     @volume_slider = Slider.new x + @effect_width * 9, @y + TRACK_HEIGHT, @effect_width, 0, 2, @volume
     @volume_slider.on_change do |value|
       @volume = value
-      # process_effects
+      process_effects
     end
 
     @covers_text = Gosu::Image.from_text "measures", 16
@@ -81,7 +83,7 @@ class Track
       @player.toggle if @player
     end
 
-    @subelements = [@speed_slider, @delay_slider, @decay_slider, @limit_slider, @volume_slider, @play_button]
+    @subelements = [@speed_slider, @delay_slider, @decay_slider, @leveler_slider, @volume_slider, @play_button]
   end
 
   def y= new_y
@@ -107,7 +109,7 @@ class Track
     @speed = 1.0
     @delay = 0.0
     @decay = 0.0
-    @limit = 0
+    @level = 0
     @volume = 1.0
   end
 
@@ -134,6 +136,16 @@ class Track
         Delay.new(@delay, @decay).apply @modified_selection_buffer, @sample_rate, @channels
     end
 
+    if @level && @level > 0
+      @modified_selection_buffer =
+        Leveler.new(@level).apply @modified_selection_buffer, @sample_rate, @channels
+    end
+
+    if @volume && @volume != 1
+      @modified_selection_buffer =
+        Volume.new(@volume).apply @modified_selection_buffer, @sample_rate, @channels
+    end
+
     Writer.new(
       @modified_selection_buffer,
       @uuid,
@@ -145,7 +157,6 @@ class Track
       @player.stop if @player && @player.playing?
       @player = Player.new @path
       @player.on_update do |time|
-        puts time
       end
       @player.on_done do
         @play_button.off
@@ -238,14 +249,14 @@ class Track
     @speed_text.draw @x, y, 1, 1, 1, Gosu::Color::BLACK
     @delay_text.draw @x + @effect_width * 2, y, 1, 1, 1, Gosu::Color::BLACK
     @decay_text.draw @x + @effect_width * 4, y, 1, 1, 1, Gosu::Color::BLACK
-    @limit_text.draw @x + @effect_width * 6, y, 1, 1, 1, Gosu::Color::BLACK
+    @leveler_text.draw @x + @effect_width * 6, y, 1, 1, 1, Gosu::Color::BLACK
     @volume_text.draw @x + @effect_width * 8, y, 1, 1, 1, Gosu::Color::BLACK
     @covers_text.draw @x, y + TRACK_HEIGHT, 1, 1, 1, Gosu::Color::BLACK if @prime
 
     @speed_slider.draw
     @delay_slider.draw
     @decay_slider.draw
-    @limit_slider.draw
+    @leveler_slider.draw
     @volume_slider.draw
     @play_button.draw
     @covers_slider.draw if @prime

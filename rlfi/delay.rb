@@ -25,7 +25,8 @@ class Delay
     sample_count = samples.count
     while effect_iter < sample_count do
       samples[effect_iter] += samples[sample_iter] * @decay_rate
-      samples[effect_iter] = 0.9 if samples[effect_iter] > 1.0
+      samples[effect_iter] = 0.99 if samples[effect_iter] >= 1.0
+      samples[effect_iter] = -0.99 if samples[effect_iter] <= -1.0
       sample_iter += 1
       effect_iter += 1
     end
@@ -42,8 +43,8 @@ class Delay
 
       channel_data[0] += samples[sample_iter][0] * @decay_rate
       channel_data[1] += samples[sample_iter][1] * @decay_rate
-      channel_data[0] = 0.9 if samples[effect_iter][0] > 1.0
-      channel_data[1] = 0.9 if samples[effect_iter][1] > 1.0
+      channel_data[0] = 1.0 if samples[effect_iter][0] > 1.0
+      channel_data[1] = 1.0 if samples[effect_iter][1] > 1.0
 
       samples[effect_iter] = channel_data
 

@@ -39,4 +39,9 @@ class Player
       end
     end
   end
+
+  def stop
+    @song.stop if @song
+    @thread.join if @thread
+  end
 end
