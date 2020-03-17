@@ -10,6 +10,7 @@ require_relative "writer"
 require_relative "player"
 require_relative "leveler"
 require_relative "volume"
+require_relative "button"
 
 class Track
   attr_reader :buffer, :selection_buffer, :modified_selection_buffer, :sample_rate, :channels, :format,
@@ -62,7 +63,7 @@ class Track
     end
 
     @leveler_text = Gosu::Image.from_text "lev", 16
-    @leveler_slider = Slider.new x + @effect_width * 7, @y + TRACK_HEIGHT, @effect_width, 0, 4, @level, true, true
+    @leveler_slider = Slider.new x + @effect_width * 7, @y + TRACK_HEIGHT, @effect_width, 0, 5, @level, true, true
     @leveler_slider.on_change do |value|
       @level = value
       process_effects
@@ -81,6 +82,11 @@ class Track
     @play_button = PlayButton.new @x + @width - 20, @y + TRACK_HEIGHT / 2 - 5, 10, false
     @play_button.on_click do
       @player.toggle if @player
+    end
+
+    @add_button = Button.new "+", 0, 0
+    @add_button.on_click do
+      @selection_callback.call @selection if @selection_callback && @selection
     end
 
     @subelements = [@speed_slider, @delay_slider, @decay_slider, @leveler_slider, @volume_slider, @play_button]
@@ -117,10 +123,17 @@ class Track
     @callback = block
   end
 
+  def on_selection &block
+    @selection_callback = block
+  end
+
   def process_effects
     unless @selection_buffer
       @modified_selection_buffer = nil
+      @selection = nil
+      @player.stop if @player
       @play_button.enabled = false
+      @subelements.delete @add_button
       return
     end
 
@@ -154,6 +167,18 @@ class Track
       @format
     ).on_write do |path|
       @path = path
+      @selection = Selection.new(
+        @modified_selection_buffer,
+        @path,
+        @sample_rate,
+        @channels,
+        @speed,
+        @delay,
+        @decay,
+        @level,
+        @volume
+      )
+      @subelements.push @add_button
       @player.stop if @player && @player.playing?
       @player = Player.new @path
       @player.on_update do |time|
@@ -231,6 +256,9 @@ class Track
   def draw
     if @start_x && @select_x && @select_x - @start_x > 0
       Gosu::draw_rect @start_x, @y, @select_x - @start_x, 40, Gosu::Color::GRAY
+      @add_button.x = @select_x
+      @add_button.y = @y
+      @add_button.draw
     end
 
 		h = TRACK_HEIGHT / 2

@@ -3,6 +3,9 @@ require "fileutils"
 require_relative "checkbox"
 require_relative "slider"
 require_relative "track"
+require_relative "selection"
+require_relative "timeline"
+require_relative "builder"
 
 class Lofi < Gosu::Window
   def initialize
@@ -16,9 +19,34 @@ class Lofi < Gosu::Window
     @elements = tracks.dup
     @elements.concat @prime_checks
     @prime_checks.first.set_checked true
+    @selections = []
+
+    @timeline = Timeline.new 0, 0, width
+    a = SecureRandom.uuid
+    @timeline.on_change do |timeline_selections|
+      t = @tracks.first
+      b = Builder.new a, timeline_selections, t.channels, t.sample_rate, t.format
+      b.on_write do |path|
+        @timeline_audio_filepath = path
+        puts path
+      end
+      b.build
+      b.write
+    end
+    @elements.push @timeline
+  
+    @colors = [Gosu::Color::RED, Gosu::Color::GREEN, Gosu::Color::YELLOW, Gosu::Color::BLUE]
+    @color_index = 0
 
     # FileUtils.rm_rf "lofi"
     FileUtils.mkdir "lofi" unless Dir.exists? "lofi"
+  end
+
+  def next_color
+    @colors[@color_index].tap do
+      @color_index += 1
+      @color_index = 0 if @color_index >= @colors.count
+    end
   end
 
   def deprime
@@ -39,8 +67,19 @@ class Lofi < Gosu::Window
         track = Track.new filepath, 30, y, 610, 80, y == 0, i
         track.read
 
-        track.on_change do |buffer, pattern|
-          puts buffer, pattern
+        track.on_change do |buffer|
+          puts buffer
+        end
+
+        track.on_selection do |selection|
+          selection.color = next_color
+          @selections.push selection
+
+          if @timeline.base?
+            @timeline.add_selection selection
+          else
+            @timeline.add_base selection
+          end
         end
 
         c = Checkbox.new 10, y + 15, 10, i == 0, i, true, 1, false
@@ -93,18 +132,34 @@ class Lofi < Gosu::Window
     # x, y, z, angle, center_x, center_y, scale_x, scale_y, color
     # @r.draw_rot width / 2, height / 2, 1, 0, 0.5, 0.5, 1, 1, Gosu::Color::BLACK
 
-    tracks.each(&:draw)
     @prime_checks.each(&:draw)
 
-    y = tracks.count * tracks.first.height
+    y = 0
+    tracks.each do |t|
+      t.draw
+      y += t.height
+    end
 
-    tracks.each do |track|
-      if track.modified_selection_buffer
-        t = Gosu::Image.from_text track.filename, 20
-        t.draw 0, y, 1, 1, 1, Gosu::Color::BLACK
-        y += t.height
+    x = 0
+    @selections.each do |s|
+      s.x = x
+      s.y = y
+      s.draw
+
+      if x + s.w + 10 > width
+        x = 0
+        y += s.h
+      else
+        x += s.w + 10
       end
     end
+
+    if @selections.any?
+      y += @selections.last.h unless y > @selections.last.y
+    end
+
+    @timeline.y = y
+    @timeline.draw
   end
 
   def needs_cursor?

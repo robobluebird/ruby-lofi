@@ -1,16 +1,29 @@
-class PlayButton
-  attr_accessor :x, :y, :size
+class Button
+  attr_reader :width, :height, :label, :x, :y
 
-  def initialize x, y, size, enabled = true
+  def initialize label, x, y, enabled = true
+    @label = x
+    @text = Gosu::Image.from_text label, 20
     @x = x
     @y = y
-    @size = size
+    @height = @text.height
+    @width = @text.width
     @enabled = enabled
-    @on = false
   end
 
-  def off
-    @on = false
+  def x= new_x
+    @x = new_x
+  end
+
+  def y= new_y
+    @y = new_y
+  end
+
+  def label= new_label
+    @label = label
+    @text = Gosu::Image.from_text label, 16
+    @height = @text.height
+    @width = @text.width
   end
 
   def on_click &block
@@ -38,7 +51,7 @@ class PlayButton
   end
 
   def contains? x, y
-    @x <= x && @x + @size >= x && @y <= y && @y + @size >= y
+    @x <= x && @x + @width >= x && @y <= y && @y + @height >= y
   end
 
   def mouse_down x, y
@@ -50,7 +63,6 @@ class PlayButton
     return unless enabled?
     if @pressed
       @pressed = false
-      @on = !@on
       @callback.call if @callback
     end
   end
@@ -65,13 +77,7 @@ class PlayButton
 
   def draw
     tc, bgc = enabled? ? pressed? ? [white, black] : [black, white] : [gray, white]
-    Gosu::draw_rect @x, @y, @size, @size, bgc
-
-    if @on
-      Gosu::draw_rect @x + 2, @y + 2, 2, @size - 4, tc
-      Gosu::draw_rect @x + 6, @y + 2, 2, @size - 4, tc
-    else
-      Gosu::draw_triangle @x + 2, @y + 2, tc, @x + @size - 2, @y + @size / 2.0, tc, @x + 2, @y + @size - 2, tc
-    end
+    Gosu::draw_rect @x, @y, @width, @height, bgc
+    @text.draw @x, @y - 5, 1, 1, 1, tc
   end
 end
