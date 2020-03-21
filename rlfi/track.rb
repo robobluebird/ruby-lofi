@@ -14,7 +14,7 @@ require_relative "button"
 
 class Track
   attr_reader :buffer, :selection_buffer, :modified_selection_buffer, :sample_rate, :channels, :format,
-              :filepath, :filename
+              :filepath, :filename, :tag
 
   attr_accessor :y, :height
   
@@ -127,6 +127,42 @@ class Track
     @selection_callback = block
   end
 
+  def nudge side, direction
+    puts "hi #{side} #{direction}"
+
+    if side == :start
+      if direction == :outward
+        if @start_x && @start_x > @x
+          if @start_x - 1 >= @x
+            @start_x -= 1
+          else
+            @start_x = @x
+          end
+        end
+      elsif direction == :inward
+        if @start_x && @select_x && @start_x < @select_x && @start_x + 1 < @select_x
+          @start_x += 1
+        end
+      end
+    elsif side == :end
+      if direction == :inward
+        if @start_x && @select_x &&  @select_x > @start_x && @select_x - 1 >= @start_x
+          @select_x -= 1
+        end
+      elsif direction == :outward
+        if @select_x && @select_x < @x + @track_width
+          if @select_x + 1 <= @x + @track_width
+            @select_x += 1
+          else
+            @select_x = @x + @track_width
+          end
+        end
+      end
+    end
+
+    mouse_up nil, nil, true
+  end
+
   def process_effects
     unless @selection_buffer
       @modified_selection_buffer = nil
@@ -134,6 +170,7 @@ class Track
       @player.stop if @player
       @play_button.enabled = false
       @subelements.delete @add_button
+      @callback.call nil, nil if @callback
       return
     end
 
@@ -187,7 +224,7 @@ class Track
         @play_button.off
       end
       @play_button.enabled = true
-      @callback.call @modified_selection_buffer if @callback
+      @callback.call @modified_selection_buffer, @tag if @callback
     end.write
   end
 
@@ -204,8 +241,8 @@ class Track
     end
   end
 
-  def mouse_up x, y
-    if @selecting && @start_x && @select_x
+  def mouse_up x, y, nudging = false
+    if (@selecting || nudging) && @start_x && @select_x
       @selecting = false
 
       if @select_x <= @start_x
@@ -219,7 +256,7 @@ class Track
         (start_index..end_index).each.with_index { |i,j| @selection_buffer[j] = @buffer[i] }
         process_effects
       end
-    elsif @subelement
+    elsif @subelement && x && y && !nudging
       @subelement.mouse_up x, y
       @subelement = nil
     end

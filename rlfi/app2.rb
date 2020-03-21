@@ -18,7 +18,7 @@ class Lofi < Gosu::Window
     @mouse_down = false
     @elements = tracks.dup
     @elements.concat @prime_checks
-    @prime_checks.first.set_checked true
+    # @prime_checks.first.set_checked true
     @selections = []
 
     @timeline = Timeline.new 0, 0, width
@@ -59,16 +59,20 @@ class Lofi < Gosu::Window
     @prime_checks.each { |c| c.set_checked c.tag == tag, false }
   end
 
+  def track_with_most_recent_selection
+    @tracks.find { |t| t.tag == @most_recent_track_selection_tag } if @most_recent_track_selection_tag
+  end
+
   def tracks
     @tracks ||= begin
       y = 0
 
       @files.map.with_index do |filepath, i|
-        track = Track.new filepath, 30, y, 610, 80, y == 0, i
+        track = Track.new filepath, 20, y, 620, 80, false, i
         track.read
 
-        track.on_change do |buffer|
-          puts buffer
+        track.on_change do |buffer, tag|
+          @most_recent_track_selection_tag = tag
         end
 
         track.on_selection do |selection|
@@ -81,24 +85,6 @@ class Lofi < Gosu::Window
             @timeline.add_base selection
           end
         end
-
-        c = Checkbox.new 10, y + 15, 10, i == 0, i, true, 1, false
-        c.on_change do |checked, tag|
-          if checked
-            deprime
-            decheck tag
-            track.prime = true
-
-            ty = 0
-            @tracks.each.with_index do |t, ti|
-              t.y = ty
-              @prime_checks[ti].y = ty + 15
-              ty += t.height
-            end
-          end
-        end
-
-        @prime_checks << c
 
         y += 80
 
@@ -121,16 +107,35 @@ class Lofi < Gosu::Window
       @mouse_down = false
       up = @elements.find { |e| e.contains? mouse_x, mouse_y }
       up.mouse_up mouse_x, mouse_y if up
+    elsif (button_down?(Gosu::KB_LEFT) || button_down?(Gosu::KB_J))
+      if !@left && track_with_most_recent_selection
+        @left, @right = true, false
+
+        if button_down?(Gosu::KB_LEFT_SHIFT) || button_down?(Gosu::KB_RIGHT_SHIFT)
+          track_with_most_recent_selection.nudge :start, :inward
+        else
+          track_with_most_recent_selection.nudge :start, :outward
+        end
+      end
+    elsif @left
+      @left = false
+    elsif (button_down?(Gosu::KB_RIGHT) || button_down?(Gosu::KB_L))
+      if !@right && track_with_most_recent_selection
+        @right, @left = true, false
+
+        if button_down?(Gosu::KB_LEFT_SHIFT) || button_down?(Gosu::KB_RIGHT_SHIFT)
+          track_with_most_recent_selection.nudge :end, :inward
+        else
+          track_with_most_recent_selection.nudge :end, :outward
+        end
+      end
+    elsif @right
+      @right = false
     end
   end
  
   def draw
     draw_rect 0, 0, width, height, Gosu::Color::WHITE
-
-    # @r = Gosu::Image.from_text "what the...", 20
-
-    # x, y, z, angle, center_x, center_y, scale_x, scale_y, color
-    # @r.draw_rot width / 2, height / 2, 1, 0, 0.5, 0.5, 1, 1, Gosu::Color::BLACK
 
     @prime_checks.each(&:draw)
 
