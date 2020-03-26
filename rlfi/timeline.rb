@@ -37,6 +37,22 @@ class Timeline
     @timeline_selections.map { |s| s.index }.sort.last + 1
   end
 
+  def delete selection
+    ts = @timeline_selections.find { |t| t.selection == selection }
+    tsi = ts.index
+    @timeline_selections.delete ts
+    @timeline_selections.each do |tss|
+      if tss.index > tsi
+        tss.index -= 1
+        
+        if tss.index == 0
+          tss.base = true 
+          tss.segment_width = @measure_width
+        end
+      end
+    end.tap { @h -= 20 }
+  end
+
   def add_base selection
     if base?
       base.index = next_index

@@ -11,6 +11,7 @@ class Selection
     @decay = decay
     @level = level
     @volume = volume
+    @moused = false
     @w = 100
     @h = 50
     @x = 0
@@ -20,6 +21,10 @@ class Selection
     @delete_button.on_click do
       @delete_callback.call if @delete_callback
     end
+  end
+
+  def contains? x, y
+    x >= @x && x <= @x + @w && y >= y && y <= @y + @h
   end
 
   def color= color
@@ -39,6 +44,21 @@ class Selection
   def y= new_y
     @y = new_y
     @delete_button.y = @y
+  end
+
+  def mouse_down x, y
+    @delete_button.mouse_down x, y if @delete_button.contains? x, y
+    @moused = true
+  end
+
+  def mouse_up x, y
+    if @moused
+      @delete_button.mouse_up x, y if @delete_button.contains? x, y
+      @moused = false
+    end
+  end
+
+  def mouse_update x, y
   end
 
   def rms

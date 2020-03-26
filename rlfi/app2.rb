@@ -76,8 +76,16 @@ class Lofi < Gosu::Window
         end
 
         track.on_selection do |selection|
-          selection.color = next_color
+          @elements.push selection
           @selections.push selection
+
+          selection.color = next_color
+
+          selection.on_delete do
+            @elements.delete selection
+            @selections.delete selection
+            @timeline.delete selection
+          end
 
           if @timeline.base?
             @timeline.add_selection selection

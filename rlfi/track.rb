@@ -44,6 +44,7 @@ class Track
     @speed_slider.on_change do |value|
       if @speed > 0
         @speed = value
+        @changed = true
         process_effects
       end
     end
@@ -52,6 +53,7 @@ class Track
     @delay_slider = Slider.new x + @effect_width * 3, @y + TRACK_HEIGHT, @effect_width, 0, 3, @delay
     @delay_slider.on_change do |value|
       @delay = value
+      @changed = true
       process_effects
     end
 
@@ -59,6 +61,7 @@ class Track
     @decay_slider = Slider.new x + @effect_width * 5, @y + TRACK_HEIGHT, @effect_width, 0, 3, @decay
     @decay_slider.on_change do |value|
       @decay = value
+      @changed = true
       process_effects
     end
 
@@ -66,6 +69,7 @@ class Track
     @leveler_slider = Slider.new x + @effect_width * 7, @y + TRACK_HEIGHT, @effect_width, 0, 5, @level, true, true
     @leveler_slider.on_change do |value|
       @level = value
+      @changed = true
       process_effects
     end
 
@@ -73,6 +77,7 @@ class Track
     @volume_slider = Slider.new x + @effect_width * 9, @y + TRACK_HEIGHT, @effect_width, 0, 2, @volume
     @volume_slider.on_change do |value|
       @volume = value
+      @changed = true
       process_effects
     end
 
@@ -86,7 +91,8 @@ class Track
 
     @add_button = Button.new "+", 0, 0
     @add_button.on_click do
-      @selection_callback.call @selection if @selection_callback && @selection
+      @selection_callback.call @selection if @selection_callback && @selection && @changed
+      @changed = false
     end
 
     @subelements = [@speed_slider, @delay_slider, @decay_slider, @leveler_slider, @volume_slider, @play_button]
@@ -128,8 +134,6 @@ class Track
   end
 
   def nudge side, direction
-    puts "hi #{side} #{direction}"
-
     if side == :start
       if direction == :outward
         if @start_x && @start_x > @x
@@ -165,6 +169,7 @@ class Track
 
   def process_effects
     unless @selection_buffer
+      @changed = false
       @modified_selection_buffer = nil
       @selection = nil
       @player.stop if @player
@@ -250,10 +255,20 @@ class Track
         process_effects
       else
         buffer_count = @buffer.count
-        start_index = (((@start_x - @x) / @width) * buffer_count).to_i
-        end_index = ((@select_x - @x) / @width * buffer_count).to_i
+
+        start_width = @start_x - @x
+        select_width = @select_x - @x
+
+        start_index = ((start_width / @track_width) * buffer_count).to_i
+        end_index = ((select_width / @track_width) * buffer_count).to_i
+
         @selection_buffer = RubyAudio::Buffer.float end_index - start_index + 1, @channels
-        (start_index..end_index).each.with_index { |i,j| @selection_buffer[j] = @buffer[i] }
+
+        (start_index...end_index).each.with_index { |i,j|
+          @selection_buffer[j] = @buffer[i]
+        }
+
+        @changed = true
         process_effects
       end
     elsif @subelement && x && y && !nudging
@@ -264,7 +279,7 @@ class Track
 
   def mouse_update x, y
     if @selecting
-      @select_x = x
+      @select_x = x if x <= @x + @track_width
     elsif @subelement
       @subelement.mouse_update x, y
     end

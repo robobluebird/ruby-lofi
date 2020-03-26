@@ -56,11 +56,13 @@ class Button
 
   def mouse_down x, y
     return unless enabled?
+
     @pressed = true
   end
 
   def mouse_up x, y
     return unless enabled?
+
     if @pressed
       @pressed = false
       @callback.call if @callback
