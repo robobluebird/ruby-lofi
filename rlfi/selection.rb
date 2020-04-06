@@ -1,5 +1,6 @@
 class Selection
   attr_reader :w, :h, :x, :y, :buffer, :path, :primary_color, :secondary_color
+  attr_accessor :deleteable
 
   def initialize buffer, path, sample_rate, channels, speed = 1.0, delay = 0.0, decay = 0.0, level = 0, volume = 1.0
     @buffer = buffer
@@ -12,6 +13,7 @@ class Selection
     @level = level
     @volume = volume
     @moused = false
+    @deleteable = true
     @w = 100
     @h = 50
     @x = 0
@@ -47,13 +49,13 @@ class Selection
   end
 
   def mouse_down x, y
-    @delete_button.mouse_down x, y if @delete_button.contains? x, y
+    @delete_button.mouse_down x, y if @delete_button.contains?(x, y) && @deleteable
     @moused = true
   end
 
   def mouse_up x, y
     if @moused
-      @delete_button.mouse_up x, y if @delete_button.contains? x, y
+      @delete_button.mouse_up x, y if @delete_button.contains?(x, y) && @deleteable
       @moused = false
     end
   end
@@ -71,7 +73,7 @@ class Selection
 
   def draw
 		h = @h / 2
-    @delete_button.draw
+    @delete_button.draw if @deleteable
     rms.each.with_index do |r, i|
       max = r[1] * h
       min = r[2].abs * h

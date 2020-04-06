@@ -9,6 +9,10 @@ class PlayButton
     @on = false
   end
 
+  def on
+    @on = true
+  end
+
   def off
     @on = false
   end

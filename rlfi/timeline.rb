@@ -11,10 +11,61 @@ class Timeline
     @y = y
     @w = w
     @h = 0
-    @measure_width = @w / 16
+    @measures = 4
+    @drum_width = @w / 16
+    @measure_width = @w / @measures
     @subdiv_width = @measure_width / 16 # 16 measures of 16th notes
     @segment_height = 20
     @timeline_selections = []
+    @beats = []
+    @beats_added
+  end
+
+  def add_beat_selections
+    return if @beats.any?
+
+    filenames = %w(808_kick.wav 808_snare.wav 808_hhc.wav)
+    colors = [Gosu::Color::AQUA, Gosu::Color::YELLOW, Gosu::Color::FUCHSIA]
+
+    s = Selection.new(nil, nil, nil, nil, 1.0, 0.0, 0.0, 0, 1.0)
+    s.color = Gosu::Color::BLACK
+
+    t = TimelineSelection.new(next_index, s, @measure_width)
+    t.synthetic_width = @measure_width
+
+    @timeline_selections.push(t).tap { @h += 20 }
+
+    filenames.each.with_index do |filename, i|
+      buffer, sample_rate, channels = nil, nil, 1
+
+      RubyAudio::Sound.open filename do |sound|
+        buffer = RubyAudio::Buffer.float sound.info.frames, channels
+        sample_rate = sound.info.samplerate
+        sound.read buffer
+      end
+
+      selection = Selection.new(
+        buffer,
+        filename,
+        sample_rate,
+        channels,
+        1.0, # speed
+        0.0, # delay
+        0.0, # decay
+        0,   # level
+        1.0  # volume
+      )
+
+      selection.color = colors[i]
+
+      @timeline_selections.push(
+        TimelineSelection.new(next_index, selection, @drum_width, [], true)
+      ).tap { @h += 20 }
+    end
+
+    @beats_added = true
+
+    self
   end
 
   def on_change &block
@@ -41,29 +92,48 @@ class Timeline
     ts = @timeline_selections.find { |t| t.selection == selection }
     tsi = ts.index
     @timeline_selections.delete ts
-    @timeline_selections.each do |tss|
-      if tss.index > tsi
-        tss.index -= 1
-        
-        if tss.index == 0
-          tss.base = true 
-          tss.segment_width = @measure_width
+
+    @h -= 20
+
+    if tsi > 0
+      @timeline_selections.each do |tss|
+        if tss.index > tsi
+          tss.index -= 1
+          
+          if tss.index == 0
+            tss.segment_width = @measure_width
+          end
         end
       end
-    end.tap { @h -= 20 }
+    end
   end
 
   def add_base selection
-    if base?
-      base.index = next_index
-      base.base = false
-    end
+    raise "Already set base in timeline" if base?
 
-    @timeline_selections.push(TimelineSelection.new(true, 0, selection, @measure_width)).tap { @h += 20 }
+    @timeline_selections.push(TimelineSelection.new(0, selection, @measure_width)).tap { @h += 20 }
+
+    add_beat_selections if !@beats_added
+
+    self
   end
 
   def add_selection selection
-    @timeline_selections.push(TimelineSelection.new(false, next_index, selection, @subdiv_width)).tap { @h += 20 }
+    if !base?
+      add_base selection
+      return
+    end
+
+    @timeline_selections.each do |ts|
+      if ts.index >= 1
+        ts.index += 1
+      end
+    end
+
+    @timeline_selections.insert(
+      1,
+      TimelineSelection.new(1, selection, @subdiv_width)
+    ).tap { @h += 20 }
   end
 
   def mouse_down x, y
@@ -93,11 +163,9 @@ class Timeline
       return
     end
 
-    x_index = 0
     x_offset = 0
     while x_offset + selection_info.segment_width < adj_x do
       x_offset += selection_info.segment_width
-      x_index += 1
     end
 
     existing_segment = selection_info.segments.find do |s|
@@ -106,12 +174,28 @@ class Timeline
 
     if existing_segment
       selection_info.segments.delete existing_segment
+    elsif selection_info.synthetic_width
+      draw_width = selection_info.synthetic_width
+
+      total_buffer_size = base.selection.buffer.count * @measures
+
+      index_in_total_buffer = ((x_offset.to_f / @w) * total_buffer_size).floor
+      
+      coords = Coords.new x_offset, y_offset + @y, draw_width, @segment_height
+
+      selection_info.segments.push SelectionSegment.new coords, index_in_total_buffer
     else
       buffer_count = selection_info.selection.buffer.count
 
-      draw_width = (buffer_count.to_f / base.selection.buffer.count) * @measure_width
+      draw_width, total_buffer_size = nil, nil
 
-      total_buffer_size = base.selection.buffer.count * 16
+      if selection_info.drum?
+        draw_width = @drum_width
+        total_buffer_size = base.selection.buffer.count
+      else
+        draw_width = (buffer_count.to_f / base.selection.buffer.count) * @measure_width
+        total_buffer_size = base.selection.buffer.count * @measures
+      end
 
       index_in_total_buffer = ((x_offset.to_f / @w) * total_buffer_size).floor
 
@@ -130,17 +214,21 @@ class Timeline
   def draw
     y = @y
 
-    (@h / @segment_height).times do |i|
+    @timeline_selections.count.times do |i|
       color = i % 2 == 0 ? Gosu::Color.argb(0x66_808080) : Gosu::Color.argb(0x33_808080)
       Gosu::draw_rect @x, y, @w, @segment_height, color
       y += @segment_height
     end
 
-    @timeline_selections.each do |selection|
+    y = @y
+
+    @timeline_selections.sort_by { |t| t.index }.each do |selection|
       selection.segments.each do |segment|
         c = segment.coords
-        Gosu::draw_rect c.x, c.y, c.w, c.h, selection.selection.primary_color
+        Gosu::draw_rect c.x, y, c.w, c.h, selection.selection.primary_color
       end
+
+      y += @segment_height
     end
   end
 end

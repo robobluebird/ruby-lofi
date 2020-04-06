@@ -14,6 +14,8 @@ class Writer
 
   def write
     path = File.join Dir.pwd, "lofi", @name
+
+    # FileUtils.rm_rf path
     
     info = RubyAudio::SoundInfo.new(
       channels: @channels,

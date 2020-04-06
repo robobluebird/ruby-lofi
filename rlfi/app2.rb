@@ -20,12 +20,25 @@ class Lofi < Gosu::Window
     @elements.concat @prime_checks
     # @prime_checks.first.set_checked true
     @selections = []
+    @measures = 4
 
     @timeline = Timeline.new 0, 0, width
-    a = SecureRandom.uuid
+    track_name = "#{SecureRandom.uuid}.wav"
     @timeline.on_change do |timeline_selections|
-      t = @tracks.first
-      b = Builder.new a, timeline_selections, t.channels, t.sample_rate, t.format
+      base = timeline_selections.find { |s| s.base? }
+      t = tracks.first
+
+      if !@buffer
+        @frame_count = base.selection.buffer.count * @measures
+        @buffer = RubyAudio::Buffer.float @frame_count, t.channels
+        i = 0
+        while i < @frame_count do
+          @buffer[i] = 0.0
+          i += 1
+        end
+      end
+
+      b = Builder.new track_name, timeline_selections, t.channels, t.sample_rate, t.format, @buffer.dup
       b.on_write do |path|
         @timeline_audio_filepath = path
         puts path
@@ -79,6 +92,7 @@ class Lofi < Gosu::Window
           @elements.push selection
           @selections.push selection
 
+          selection.deleteable = false
           selection.color = next_color
 
           selection.on_delete do
@@ -115,7 +129,7 @@ class Lofi < Gosu::Window
       @mouse_down = false
       up = @elements.find { |e| e.contains? mouse_x, mouse_y }
       up.mouse_up mouse_x, mouse_y if up
-    elsif (button_down?(Gosu::KB_LEFT) || button_down?(Gosu::KB_J))
+    elsif (button_down?(Gosu::KB_LEFT) || button_down?(Gosu::KB_H))
       if !@left && track_with_most_recent_selection
         @left, @right = true, false
 
@@ -139,6 +153,27 @@ class Lofi < Gosu::Window
       end
     elsif @right
       @right = false
+    elsif button_down? Gosu::KB_SPACE
+      if !@space && track_with_most_recent_selection
+        @space = true
+        track_with_most_recent_selection.toggle_play
+      end
+    elsif @space
+      @space = false
+    elsif (button_down?(Gosu::KB_UP) || button_down?(Gosu::KB_K))
+      if !@up && track_with_most_recent_selection
+        @up, @down = true, false
+        track_with_most_recent_selection.zoom_in
+      end
+    elsif @up
+      @up = false
+    elsif (button_down?(Gosu::KB_DOWN) || button_down?(Gosu::KB_J))
+      if !@down && track_with_most_recent_selection
+        @down, @up = true, false
+        track_with_most_recent_selection.zoom_out
+      end
+    elsif @down
+      @down = false
     end
   end
  
