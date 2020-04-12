@@ -260,7 +260,7 @@ class Track
         new_selection_start_index = ((start_width.to_f / @track_width) * buffer_count).to_i
         new_selection_end_index = ((select_width.to_f / @track_width) * buffer_count).to_i
 
-        if @selection_start_index
+        if @selection_start_index && @selection_end_index
           @frames_added_to_start_since_zoom += new_selection_start_index - @selection_start_index
           @frames_added_to_end_since_zoom += new_selection_end_index - @selection_end_index
         end
@@ -271,7 +271,7 @@ class Track
         @selection_buffer = RubyAudio::Buffer.float @selection_end_index - @selection_start_index + 1, @channels
 
         (@selection_start_index...@selection_end_index).each.with_index { |i,j|
-          @selection_buffer[j] = @buffer[i]
+          @selection_buffer[j] = @display_buffer[i]
         }
 
         @changed = true

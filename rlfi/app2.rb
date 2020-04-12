@@ -13,6 +13,8 @@ class Lofi < Gosu::Window
 
     self.caption = "ruby lofi"
 
+    track_name = "#{SecureRandom.uuid}.wav"
+
     @files = ARGV
     @prime_checks = []
     @mouse_down = false
@@ -23,13 +25,34 @@ class Lofi < Gosu::Window
     @measures = 4
 
     @timeline = Timeline.new 0, 0, width
-    track_name = "#{SecureRandom.uuid}.wav"
-    @timeline.on_change do |timeline_selections|
-      base = timeline_selections.find { |s| s.base? }
+
+    @timeline.on_recalculate do |measures, timeline_selections, base_buffer_count|
+      @measures = measures
+
+      t = tracks.first
+
+      @frame_count = base_buffer_count * @measures
+      @buffer = RubyAudio::Buffer.float @frame_count, t.channels
+      i = 0
+      while i < @frame_count do
+        @buffer[i] = 0.0
+        i += 1
+      end
+
+      b = Builder.new track_name, timeline_selections, t.channels, t.sample_rate, t.format, @buffer.dup
+      b.on_write do |path|
+        @timeline_audio_filepath = path
+        puts path
+      end
+      b.build
+      b.write
+    end
+
+    @timeline.on_change do |timeline_selections, base_buffer_count|
       t = tracks.first
 
       if !@buffer
-        @frame_count = base.selection.buffer.count * @measures
+        @frame_count = base_buffer_count * @measures
         @buffer = RubyAudio::Buffer.float @frame_count, t.channels
         i = 0
         while i < @frame_count do

@@ -1,5 +1,5 @@
 class Slider
-  attr_reader :x, :w, :h, :value
+  attr_reader :x, :y, :w, :h, :value
   attr_accessor :show_value
 
   def initialize x, y, w, min, max, initial_value = nil, round = false, show_value = false

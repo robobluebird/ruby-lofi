@@ -1,6 +1,6 @@
 class TimelineSelection
-  attr_reader :selection, :segments
-  attr_accessor :index, :segment_width, :synthetic_width
+  attr_reader :selection
+  attr_accessor :index, :segments, :segment_width, :synthetic_width
 
   def initialize index, selection, segment_width, segments = [], drum = false
     @index, @selection, @segment_width, @segments, @drum =

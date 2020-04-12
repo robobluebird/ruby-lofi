@@ -1,7 +1,7 @@
 class SelectionSegment
-  attr_reader :coords, :indicies
+  attr_accessor :coords, :indicies, :original_x
 
-  def initialize coords, indicies
-    @coords, @indicies = coords, indicies
+  def initialize original_x, coords, indicies
+    @original_x, @coords, @indicies = original_x, coords, indicies
   end
 end
