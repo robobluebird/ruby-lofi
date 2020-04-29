@@ -260,7 +260,7 @@ class Track
         new_selection_start_index = ((start_width.to_f / @track_width) * buffer_count).to_i
         new_selection_end_index = ((select_width.to_f / @track_width) * buffer_count).to_i
 
-        if @selection_start_index && @selection_end_index
+        if @selection_start_index && @selection_end_index && @zoomed
           @frames_added_to_start_since_zoom += new_selection_start_index - @selection_start_index
           @frames_added_to_end_since_zoom += new_selection_end_index - @selection_end_index
         end

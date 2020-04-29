@@ -15,12 +15,17 @@ class Lofi < Gosu::Window
 
     track_name = "#{SecureRandom.uuid}.wav"
 
+    @play_button = PlayButton.new width / 2 - 10, height - 20, 20, false
+
+    @play_button.on_click do
+      @player.toggle if @player
+    end
+
     @files = ARGV
     @prime_checks = []
     @mouse_down = false
     @elements = tracks.dup
     @elements.concat @prime_checks
-    # @prime_checks.first.set_checked true
     @selections = []
     @measures = 4
 
@@ -41,9 +46,21 @@ class Lofi < Gosu::Window
 
       b = Builder.new track_name, timeline_selections, t.channels, t.sample_rate, t.format, @buffer.dup
       b.on_write do |path|
-        @timeline_audio_filepath = path
-        puts path
+        @path = path
+        @player = Player.new @path
+
+        @player.on_update do |time|
+        end
+
+        @player.on_done do
+          @play_button.off
+        end
+
+        @play_button.enabled = true
+        @most_recently_edited_timeline = true
+        @most_recent_track_selection_tag = nil
       end
+
       b.build
       b.write
     end
@@ -63,13 +80,27 @@ class Lofi < Gosu::Window
 
       b = Builder.new track_name, timeline_selections, t.channels, t.sample_rate, t.format, @buffer.dup
       b.on_write do |path|
-        @timeline_audio_filepath = path
-        puts path
+        @path = path
+        @player = Player.new @path
+
+        @player.on_update do |time|
+        end
+
+        @player.on_done do
+          @play_button.off
+        end
+
+        @play_button.enabled = true
+        @most_recently_edited_timeline = true
+        @most_recent_track_selection_tag = nil
       end
+
       b.build
       b.write
     end
+
     @elements.push @timeline
+    @elements.push @play_button
   
     @colors = [Gosu::Color::RED, Gosu::Color::GREEN, Gosu::Color::YELLOW, Gosu::Color::BLUE]
     @color_index = 0
@@ -91,13 +122,10 @@ class Lofi < Gosu::Window
     end
   end
 
-  def decheck tag
-    @prime_checks.each { |c| c.set_checked c.tag == tag, false }
-  end
-
   def track_with_most_recent_selection
     @tracks.find { |t| t.tag == @most_recent_track_selection_tag } if @most_recent_track_selection_tag
   end
+  
 
   def tracks
     @tracks ||= begin
@@ -109,6 +137,7 @@ class Lofi < Gosu::Window
 
         track.on_change do |buffer, tag|
           @most_recent_track_selection_tag = tag
+          @most_recently_edited_timeline = false
         end
 
         track.on_selection do |selection|
@@ -177,9 +206,14 @@ class Lofi < Gosu::Window
     elsif @right
       @right = false
     elsif button_down? Gosu::KB_SPACE
-      if !@space && track_with_most_recent_selection
+      if !@space
         @space = true
-        track_with_most_recent_selection.toggle_play
+        if @most_recently_edited_timeline
+          @player.toggle if @player
+          @player && @player.playing? ? @play_button.on : @play_button.off
+        elsif track_with_most_recent_selection
+          track_with_most_recent_selection.toggle_play
+        end
       end
     elsif @space
       @space = false
@@ -229,6 +263,10 @@ class Lofi < Gosu::Window
       y += @selections.last.h unless y > @selections.last.y
     end
 
+    if @timeline.timeline_selections.any?
+      @play_button.draw
+    end
+
     @timeline.y = y
     @timeline.draw
   end
@@ -236,18 +274,6 @@ class Lofi < Gosu::Window
   def needs_cursor?
     true
   end
-
-=begin
-@beat = Composer.new
-@beat.measures_per_sample = 1
-@beat.samples_per_loop = 1
-@beat.loops = 4
-@beat.set_base path
-@beat.set_pattern tag, instrument, steps
-@beat.swing = status
-@path = @beat.write
-=end
-
 end
 
 Lofi.new.show

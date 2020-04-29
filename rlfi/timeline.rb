@@ -3,14 +3,14 @@ require_relative "selection_segment"
 require_relative "coords"
 
 class Timeline
-  attr_reader :selections
+  attr_reader :timeline_selections
   attr_accessor :x, :y, :w, :h
 
   def initialize x, y, w
     @x = x
     @y = y
     @w = w
-    @h = 20
+    @h = 40
     @measures = 4
     @drum_width = @w / 16
     @measure_width = @w / @measures
@@ -54,9 +54,30 @@ class Timeline
     @beat_text = Gosu::Image.from_text "measures in base", 16
     @beat_slider = Slider.new @x + @w - @effect_width - 40 - @measures_text.width - @measures_slider.w, @y, @effect_width, 1, 4, @measures_in_base, true, true
     @beat_slider.on_change do |value|
+      @measures_in_base = value
+
+      @timeline_selections.select { |ts| ts.synthetic_width }.each do |ts|
+        ts.segment_width = @measure_width / @measures_in_base
+        ts.synthetic_width = @measure_width / @measures_in_base
+      end
+
+      recalculate
+
+      if @recalculate_callback
+        @recalculate_callback.call @measures, @timeline_selections, base.selection.buffer.count
+      else
+        raise "No recalculate callback for timeline...things will break!"
+      end
     end
 
-    @subelements = [@measures_slider, @beat_slider]
+    @drum_volume_text = Gosu::Image.from_text "drum volume", 16
+    @drum_volume_slider = Slider.new @x + @w - @effect_width - 20, lower_y, @effect_width, 0, 2, 1, false, true
+
+    @subelements = [@measures_slider, @beat_slider, @drum_volume_slider]
+  end
+
+  def lower_y
+    @y + 20 + @timeline_selections.count * 20
   end
 
   def on_recalculate &block
@@ -187,7 +208,7 @@ class Timeline
   def mouse_down x, y
     @mousing = true
 
-    if y >= @y && y <= @y + 20
+    if (y >= @y && y <= @y + 20) || (y <= @y + @h && y >= @y + @h - 20)
       @subelement = @subelements.find { |s| s.contains? x, y }
       @subelement.mouse_down x, y if @subelement
     end
@@ -251,7 +272,7 @@ class Timeline
 
       if selection_info.drum?
         draw_width = @drum_width
-        total_buffer_size = base.selection.buffer.count
+        total_buffer_size = base.selection.buffer.count / @measures
       else
         draw_width = (buffer_count.to_f / base.selection.buffer.count) * @measure_width
         total_buffer_size = base.selection.buffer.count * @measures
@@ -272,7 +293,7 @@ class Timeline
   end
 
   def recalculate
-    @timeline_selections.each do |ts|
+    @timeline_selections.select { |ts| !ts.drum? }.each do |ts|
       segments = []
 
       ts.segments.each do |ss|
@@ -311,7 +332,11 @@ class Timeline
         ss.coords.w = draw_width
         ss.indicies = indicies
 
-        if ts.synthetic_width || ts.base?
+        if ts.synthetic_width
+          if !segments.find { |s| s.indicies == indicies }
+            segments << ss
+          end
+        elsif ts.base?
           if !segments.find { |s| s.indicies.cover? indicies }
             segments << ss
           end
@@ -342,10 +367,16 @@ class Timeline
       y += @segment_height
     end
 
-    @measures_text.draw @x + @w - @measures_text.width - @measures_slider.w - 20, @y, 1, 1, 1, Gosu::Color::BLACK
-    @measures_slider.draw
+    if @timeline_selections.any?
+      @measures_text.draw @x + @w - @measures_text.width - @measures_slider.w - 20, @y, 1, 1, 1, Gosu::Color::BLACK
+      @measures_slider.draw
 
-    @beat_text.draw @x + @w - @beat_text.width - @beat_slider.w - 40 - @measures_slider.w - @measures_text.width, @y, 1, 1, 1, Gosu::Color::BLACK
-    @beat_slider.draw
+      @beat_text.draw @x + @w - @beat_text.width - @beat_slider.w - 40 - @measures_slider.w - @measures_text.width, @y, 1, 1, 1, Gosu::Color::BLACK
+      @beat_slider.draw
+
+      @drum_volume_text.draw @x + @w - @measures_text.width - @measures_slider.w - 20, lower_y, 1, 1, 1, Gosu::Color::BLACK
+      @drum_volume_slider.y = lower_y
+      @drum_volume_slider.draw
+    end
   end
 end
